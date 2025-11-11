@@ -20,20 +20,6 @@
 <body>
   <div id="root"></div>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Load all modules in dependency order -->
-  <script type="text/babel" data-presets="react,typescript" src="src/utils/audio.ts"></script>
-  <script type="text/babel" data-presets="react,typescript" src="src/components/ApiKeyModal.tsx"></script>
-  <script type="text/babel" data-presets="react,typescript" src="src/context/ApiContext.tsx"></script>
-  <script type="text/babel" data-presets="react,typescript" src="src/components/MemoryGame.tsx"></script>
-  <script type="text/babel" data-presets="react,typescript" src="src/components/Sidebar.tsx"></script>
-  <script type="text/babel" data-presets="react,typescript" src="src/views/AILabApp.tsx"></script>
-  <script type="text/babel" data-presets="react,typescript" src="src/views/KidGeniusApp.tsx"></script>
-  <script type="text/babel" data-presets="react,typescript" src="src/views/EnglishPracticeApp.tsx"></script>
-  <script type="text/babel" data-presets="react,typescript" src="src/views/QuizMasterApp.tsx"></script>
-  <script type="text/babel" data-presets="react,typescript" src="App.tsx"></script>
-
-  <!-- Load the main entry point last -->
   <script type="text/babel" data-presets="react,typescript" src="index.tsx"></script>
 </body>
 </html>
