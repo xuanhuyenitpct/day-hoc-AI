@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Copy of DayhochieuquavoiAI",
+  "description": "An interactive quiz and flashcard generator from text and PDF files.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
