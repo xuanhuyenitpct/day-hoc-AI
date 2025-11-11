@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>EduSpark AI App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body, #root {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: #0c0a18;
+      color: white;
+      font-family: sans-serif;
+    }
+
+    body {
+      --scrollbar-bg: rgba(255, 255, 255, 0.1);
+      --scrollbar-thumb: rgba(255, 255, 255, 0.3);
+      --scrollbar-thumb-hover: rgba(255, 255, 255, 0.5);
+      overflow: hidden; /* The main layout will handle scrolling */
+    }
+    
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--scrollbar-bg);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
+    
+    /* Sparkle animation for the background */
+    @keyframes sparkle {
+      0% { transform: scale(0) rotate(0deg); opacity: 0.5; }
+      50% { opacity: 1; }
+      100% { transform: scale(1.5) rotate(360deg); opacity: 0; }
+    }
+    .sparkle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: white;
+      border-radius: 50%;
+      animation-name: sparkle;
+      animation-timing-function: ease-in-out;
+      animation-iteration-count: infinite;
+      opacity: 0;
+      box-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #fff;
+    }
+
+    /* Animation for modals and content fade-in */
+    @keyframes fade-in {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fade-in {
+      animation: fade-in 0.3s ease-out forwards;
+    }
+
+    /* Styles for 3D card flip effect */
+    .perspective-1000 { perspective: 1000px; }
+    .preserve-3d { transform-style: preserve-3d; }
+    .rotate-y-180 { transform: rotateY(180deg); }
+    .backface-hidden {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden; /* For Safari */
+    }
+
+    /* Parallax Background animation */
+    @keyframes slide-bg {
+      from { background-position: 0 0; }
+      to { background-position: -1280px 0; }
+    }
+    .parallax-bg {
+        position: absolute;
+        inset: 0;
+        background-repeat: repeat-x;
+        animation-name: slide-bg;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+        will-change: background-position;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
