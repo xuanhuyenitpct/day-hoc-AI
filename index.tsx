@@ -4,96 +4,114 @@ import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Type, Modality, Chat } from "@google/genai";
 
 declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
   interface Window {
-    aistudio?: AIStudio;
     SpeechRecognition?: any;
     webkitSpeechRecognition?: any;
   }
 }
 
 // ===================================
+//      API Key Modal
+// ===================================
+const ApiKeyModal = ({ onSave }) => {
+  const [key, setKey] = useState('');
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-slate-800/80 border-2 border-purple-400 rounded-3xl p-6 w-full max-w-md shadow-lg animate-fade-in">
+        <h2 className="text-2xl font-bold mb-4">Nhập API Key của bạn</h2>
+        <p className="text-sm opacity-80 mb-4">
+          Để sử dụng ứng dụng này, bạn cần một Google AI API key. Vui lòng dán key của bạn vào ô bên dưới.
+        </p>
+        <input 
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder="Nhập API key của bạn tại đây"
+          className="w-full rounded-xl bg-black/40 border-2 border-purple-400/50 p-3 mb-4 placeholder-white/60 focus:outline-none focus:ring-4 focus:ring-purple-400/50"
+        />
+        <button
+          onClick={() => onSave(key)}
+          disabled={!key.trim()}
+          className="w-full px-6 py-3 rounded-xl font-semibold bg-purple-500 text-white disabled:opacity-50 hover:bg-purple-600 transition"
+        >
+          Lưu và Tiếp tục
+        </button>
+        <p className="text-xs text-center mt-4 opacity-70">
+          Bạn có thể lấy key từ <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-300">Google AI Studio</a>.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+
+// ===================================
 //      API Key Context
 // ===================================
 interface ApiContextType {
-  runWithApiKey: (callback: () => Promise<any>) => Promise<any>;
+  apiKey: string | null;
   isReady: boolean;
+  runWithApiKey: (callback: () => Promise<any>) => Promise<any>;
 }
 
 const ApiContext = createContext<ApiContextType | null>(null);
 
 const ApiProvider = ({ children }) => {
-  const [isReady, setIsReady] = useState(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [showKeyModal, setShowKeyModal] = useState(false);
 
-  const checkKey = useCallback(async () => {
-    if (!window.aistudio) return false;
-    try {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      setIsReady(hasKey);
-      return hasKey;
-    } catch (error) {
-      console.error("Error checking API key:", error);
-      setIsReady(false);
-      return false;
+  useEffect(() => {
+    const storedKey = localStorage.getItem('google-api-key');
+    if (storedKey) {
+      setApiKey(storedKey);
+    } else {
+      setShowKeyModal(true);
     }
   }, []);
 
-  useEffect(() => {
-    checkKey();
-  }, [checkKey]);
+  const saveApiKey = (key: string) => {
+    if (key && key.trim()) {
+      const sanitizedKey = key.trim();
+      setApiKey(sanitizedKey);
+      localStorage.setItem('google-api-key', sanitizedKey);
+      setShowKeyModal(false);
+    }
+  };
+  
+  const clearApiKey = useCallback(() => {
+    setApiKey(null);
+    localStorage.removeItem('google-api-key');
+    setShowKeyModal(true);
+  }, []);
 
   const runWithApiKey = useCallback(async (callback: () => Promise<any>) => {
-    let ready = isReady;
-    if (!ready) {
-      ready = await checkKey();
+    if (!apiKey) {
+      setShowKeyModal(true);
+      alert("Vui lòng nhập Google AI API key của bạn để tiếp tục.");
+      return Promise.reject(new Error("API key is required."));
     }
     
-    if (!ready && window.aistudio) {
-      try {
-        await window.aistudio.openSelectKey();
-        ready = await window.aistudio.hasSelectedApiKey();
-        setIsReady(ready);
-      } catch (error) {
-        console.error("Error during API key selection:", error);
-        ready = false;
-        setIsReady(false);
-      }
+    try {
+      return await callback();
+    } catch (err) {
+       const errorMessage = (err as Error).message?.toLowerCase() || '';
+       if (errorMessage.includes("api key not valid") || 
+           errorMessage.includes("permission denied") || 
+           errorMessage.includes("api key is invalid") ||
+           errorMessage.includes("requested entity was not found")) {
+          console.error("API key became invalid. Forcing re-entry.");
+          alert("API key của bạn không hợp lệ hoặc thiếu quyền. Vui lòng nhập một key hợp lệ.");
+          clearApiKey();
+       }
+       // Re-throw the original error to be handled by the caller
+       throw err;
     }
-    
-    if (ready) {
-      try {
-        return await callback();
-      } catch (err) {
-         const errorMessage = (err as Error).message || String(err);
-         if (errorMessage.includes("API key not valid") || errorMessage.includes("Requested entity was not found")) {
-            console.error("API key became invalid. Forcing re-selection.");
-            setIsReady(false);
-            if (window.aistudio) {
-               await window.aistudio.openSelectKey();
-               const newReady = await window.aistudio.hasSelectedApiKey();
-               setIsReady(newReady);
-               if(newReady) {
-                  // Retry the original callback once after successful key selection
-                  return await callback();
-               }
-            }
-         }
-         // Re-throw the original error if it's not an API key issue or if retry fails
-         throw err;
-      }
-    } else {
-       alert("Vui lòng chọn một API key của Google AI Studio để tiếp tục.");
-       console.warn("API key not available. Action blocked.");
-       return Promise.reject(new Error("API key is required to perform this action."));
-    }
-  }, [isReady, checkKey]);
+  }, [apiKey, clearApiKey]);
 
   return (
-    <ApiContext.Provider value={{ runWithApiKey, isReady }}>
+    <ApiContext.Provider value={{ apiKey, isReady: !!apiKey, runWithApiKey }}>
       {children}
+      {showKeyModal && <ApiKeyModal onSave={saveApiKey} />}
     </ApiContext.Provider>
   );
 };
@@ -153,7 +171,7 @@ const Sidebar = ({ view, setView, onLogout, isSidebarOpen }) => {
 //      AI Lab App
 // ===================================
 const AILabApp = () => {
-    const { runWithApiKey } = useApiKey();
+    const { runWithApiKey, apiKey } = useApiKey();
     const [concept, setConcept] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [explanation, setExplanation] = useState('');
@@ -181,7 +199,8 @@ const AILabApp = () => {
         }
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            if (!apiKey) throw new Error("API Key is not set.");
+            const ai = new GoogleGenAI({ apiKey });
 
             if (!chatSessionRef.current) {
                 chatSessionRef.current = ai.chats.create({
@@ -519,7 +538,7 @@ const MemoryGame = ({ onClose }) => {
 //      Kid Genius App
 // ===================================
 const KidGeniusApp = ({ currentUser }) => {
-    const { runWithApiKey } = useApiKey();
+    const { runWithApiKey, apiKey } = useApiKey();
     const [stage, setStage] = useState('setup'); // 'setup', 'quiz', 'result'
     const [settings, setSettings] = useState(() => {
         try {
@@ -644,7 +663,8 @@ const KidGeniusApp = ({ currentUser }) => {
         setError('');
         setIsFromPath(fromPath);
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            if (!apiKey) throw new Error("API Key is not set.");
+            const ai = new GoogleGenAI({ apiKey });
             const prompt = `Bạn là chuyên gia tạo câu hỏi trắc nghiệm cho học sinh trung học cơ sở Việt Nam theo Chương trình giáo dục phổ thông 2018.
 Hãy tạo 5 câu hỏi trắc nghiệm dựa trên các tiêu chí sau:
 - Lớp: ${settings.grade}
@@ -712,7 +732,8 @@ QUAN TRỌNG: Hãy kiểm tra lại thật kỹ để đảm bảo 'correctAnswe
         setIsLoading(true);
         setError('');
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            if (!apiKey) throw new Error("API Key is not set.");
+            const ai = new GoogleGenAI({ apiKey });
             const prompt = `Bạn là một gia sư AI chuyên nghiệp, tạo ra một lộ trình học tập cá nhân hóa trong 4 tuần cho học sinh Việt Nam, bám sát theo Chương trình giáo dục phổ thông 2018.
 - Lớp: ${settings.grade}
 - Môn học: ${settings.subject}
@@ -791,7 +812,8 @@ Chỉ trả về một mảng JSON gồm 4 đối tượng. Mỗi đối tượn
                 };
                 setAITutorFeedback(feedbackData);
             } else {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                if (!apiKey) throw new Error("API Key is not set.");
+                const ai = new GoogleGenAI({ apiKey });
                 const prompt = `Bạn là một gia sư AI tận tâm và thấu hiểu. Một học sinh vừa hoàn thành bài kiểm tra với điểm số ${finalScore}/100.
                 Dưới đây là những câu học sinh đã trả lời sai:
                 ${wrongAnswersInfo.join('\n\n')}
@@ -1270,7 +1292,7 @@ async function decodeAudioData(
 
 
 const EnglishPracticeApp = () => {
-    const { runWithApiKey } = useApiKey();
+    const { runWithApiKey, apiKey } = useApiKey();
     const [scenario, setScenario] = useState('general');
     const [messages, setMessages] = useState<{id: number; sender: 'ai' | 'user'; text: string}[]>([]);
     const [inputText, setInputText] = useState('');
@@ -1363,7 +1385,8 @@ const EnglishPracticeApp = () => {
         
         setLoadingAudioKey(audioKey);
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            if (!apiKey) throw new Error("API Key is not set.");
+            const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash-preview-tts",
                 contents: [{ parts: [{ text: textToPlay }] }],
@@ -1412,7 +1435,8 @@ const EnglishPracticeApp = () => {
         setMessages(prev => [...prev, newUserMessage]);
         
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            if (!apiKey) throw new Error("API Key is not set.");
+            const ai = new GoogleGenAI({ apiKey });
             
             if (!chatSessionRef.current) {
                 const currentScenario = SCENARIOS[scenario];
@@ -1636,7 +1660,7 @@ async function copyTextSafe(text) {
 }
 
 function QuizMasterApp({ userRole = 'student' }) {
-  const { runWithApiKey } = useApiKey();
+  const { runWithApiKey, apiKey } = useApiKey();
   const [stage, setStage] = useState("builder");
   const [topic, setTopic] = useState("");
   const [count, setCount] = useState(5);
@@ -1794,7 +1818,8 @@ function QuizMasterApp({ userRole = 'student' }) {
       setGenerationError("");
 
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          if (!apiKey) throw new Error("API Key is not set.");
+          const ai = new GoogleGenAI({ apiKey });
           const selectedTypesText = types.filter(t => t.checked).map(t => t.label).join(', ');
 
           const prompt = `Bạn là một trợ lý giáo dục AI đa năng. Từ nội dung được cung cấp, hãy tạo ra một "Bộ Tài Liệu Học Tập" hoàn chỉnh.
@@ -1890,7 +1915,8 @@ Hãy trả về một đối tượng JSON duy nhất có cấu trúc như sau:
     setGeminiFeedback({ title: "", body: "Đang tạo nhận xét bằng AI..." });
 
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        if (!apiKey) throw new Error("API Key is not set.");
+        const ai = new GoogleGenAI({ apiKey });
         const pct = Math.round((result.score / result.total) * 100);
 
         const wrongAnswers = questions.map((q, i) => {
@@ -2078,7 +2104,8 @@ Dựa vào kết quả này, hãy đưa ra một phản hồi gồm:
       }
       
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        if (!apiKey) throw new Error("API Key is not set.");
+        const ai = new GoogleGenAI({ apiKey });
         const limit = clamp(pdfCardCount, 1, 20);
         const prompt = `Dựa vào đoạn văn bản trích xuất từ một tài liệu, hãy tạo ra một bộ thẻ học tập (flashcards) gồm tối đa ${limit} thẻ. Mỗi thẻ phải có một mặt trước (câu hỏi hoặc thuật ngữ) và một mặt sau (câu trả lời hoặc định nghĩa). Hãy tập trung vào các khái niệm, định nghĩa quan trọng, và các sự kiện chính. Văn bản trích xuất:\n---\n${full.substring(0, 30000)}\n---\nVui lòng trả về kết quả dưới dạng một mảng JSON. Mỗi đối tượng trong mảng phải có hai thuộc tính: "front" và "back".`;
 
